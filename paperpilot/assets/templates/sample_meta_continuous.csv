@@ -1,0 +1,6 @@
+study_id,outcome_name,mean_t,sd_t,n_t,mean_c,sd_c,n_c
+Study_A,HAM-D_Score,12.5,4.2,50,16.3,4.8,50
+Study_B,HAM-D_Score,10.8,3.9,45,15.7,4.1,45
+Study_C,HAM-D_Score,13.2,5.0,60,17.1,5.3,60
+Study_D,HAM-D_Score,11.0,3.5,40,15.0,4.0,40
+Study_E,HAM-D_Score,12.0,4.5,55,16.8,4.9,55
