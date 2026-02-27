@@ -1,0 +1,107 @@
+{
+  "template_id": "meta_analysis_v1",
+  "template_name": "Meta-Analysis Extraction Template",
+  "version": "1.0",
+  "fields": [
+    {
+      "key": "study_id",
+      "label": "Study ID",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "outcome_name",
+      "label": "Outcome Name",
+      "type": "text",
+      "required": true
+    },
+    {
+      "key": "timepoint",
+      "label": "Timepoint",
+      "type": "text",
+      "required": false
+    },
+    {
+      "key": "events_t",
+      "label": "Events Treatment",
+      "type": "integer",
+      "required": false,
+      "group": "binary"
+    },
+    {
+      "key": "total_t",
+      "label": "Total N Treatment",
+      "type": "integer",
+      "required": false,
+      "group": "binary"
+    },
+    {
+      "key": "events_c",
+      "label": "Events Control",
+      "type": "integer",
+      "required": false,
+      "group": "binary"
+    },
+    {
+      "key": "total_c",
+      "label": "Total N Control",
+      "type": "integer",
+      "required": false,
+      "group": "binary"
+    },
+    {
+      "key": "mean_t",
+      "label": "Mean Treatment",
+      "type": "float",
+      "required": false,
+      "group": "continuous"
+    },
+    {
+      "key": "sd_t",
+      "label": "SD Treatment",
+      "type": "float",
+      "required": false,
+      "group": "continuous"
+    },
+    {
+      "key": "n_t",
+      "label": "N Treatment",
+      "type": "integer",
+      "required": false,
+      "group": "continuous"
+    },
+    {
+      "key": "mean_c",
+      "label": "Mean Control",
+      "type": "float",
+      "required": false,
+      "group": "continuous"
+    },
+    {
+      "key": "sd_c",
+      "label": "SD Control",
+      "type": "float",
+      "required": false,
+      "group": "continuous"
+    },
+    {
+      "key": "n_c",
+      "label": "N Control",
+      "type": "integer",
+      "required": false,
+      "group": "continuous"
+    },
+    {
+      "key": "effect_size",
+      "label": "Effect Size",
+      "type": "float",
+      "required": false
+    },
+    {
+      "key": "variance",
+      "label": "Variance",
+      "type": "float",
+      "required": false
+    }
+  ]
+}
