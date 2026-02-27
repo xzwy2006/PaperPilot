@@ -100,6 +100,10 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._update_title()
 
+        # If a project was passed at construction time, propagate it
+        if self._project:
+            self._propagate_project()
+
     def _build_ui(self):
         central = QWidget()
         self.setCentralWidget(central)
@@ -152,10 +156,19 @@ class MainWindow(QMainWindow):
         # Page stack (top)
         self._page_stack = QStackedWidget()
         self._pages = []
+        self._import_page: ImportPage | None = None
+
         for _, PageClass in NAV_ITEMS:
             page = PageClass()
             self._pages.append(page)
             self._page_stack.addWidget(page)
+            if isinstance(page, ImportPage):
+                self._import_page = page
+
+        # Connect ImportPage signal → reload record table
+        if self._import_page is not None:
+            self._import_page.records_imported.connect(self._load_records)
+
         center_layout.addWidget(self._page_stack, 1)
 
         # Record table (bottom)
@@ -196,9 +209,19 @@ class MainWindow(QMainWindow):
                 from paperpilot.core.project import Project
                 self._project = Project.open(path)
                 self._update_title()
+                self._propagate_project()
                 self._load_records()
             except Exception as e:
                 QMessageBox.critical(self, "Error", str(e))
+
+    def _propagate_project(self) -> None:
+        """Notify pages that support set_project() about the current project."""
+        for page in self._pages:
+            if hasattr(page, "set_project"):
+                try:
+                    page.set_project(self._project)
+                except Exception:
+                    pass
 
     def _load_records(self):
         if not self._project:

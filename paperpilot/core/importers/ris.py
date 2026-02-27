@@ -1,221 +1,164 @@
-"""paperpilot/core/importers/ris.py -- RIS format importer for PaperPilot.
-
-Parses standard RIS tags and PaperPilot-enhanced fields (RPID, RPF, N1/N2).
-Returns (records, decisions) tuple.
+"""
+paperpilot/core/importers/ris.py
+RIS importer for PaperPilot — Phase 3.3
 """
 from __future__ import annotations
 
 import json
 import re
-import uuid
-from datetime import date
-from typing import Optional
-
-from paperpilot.core.models import Record, ScreeningDecision
+import unicodedata
+from pathlib import Path
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
+# RIS tag → standard field
+_TAG_MAP: dict[str, str] = {
+    "TI": "title",
+    "T1": "title",
+    "TT": "title",
+    "CT": "title",
+    "AB": "abstract",
+    "N2": "abstract",
+    "AU": "authors",
+    "A1": "authors",
+    "A2": "authors",
+    "A3": "authors",
+    "PY": "year",
+    "Y1": "year",
+    "DA": "year",
+    "JO": "journal",
+    "JF": "journal",
+    "J1": "journal",
+    "J2": "journal",
+    "T2": "journal",
+    "BT": "journal",
+    "DO": "doi",
+    "AN": "pmid",
+    "KW": "keywords",
+    "DE": "keywords",
+    "ID": "keywords",
+}
 
-_TAG_RE = re.compile(r"^([A-Z][A-Z0-9])  - (.*)$")
-
-# RPID pattern embedded in ID tag
-_RPID_RE = re.compile(r"RPID:([0-9a-f-]{32,36})", re.IGNORECASE)
-# RPF fingerprint pattern embedded in M1 tag
-_RPF_RE = re.compile(r"RPF:sha256:([0-9a-fA-F]{64})", re.IGNORECASE)
-
-# N1 current-state prefix
-_N1_PREFIX = "PaperPilot Screening Current|"
-# N2 history prefix
-_N2_PREFIX = "PaperPilot Screening Log "
+_PUNCT_RE = re.compile(r"[^\w\s]", re.UNICODE)
+_SPACE_RE = re.compile(r"\s+")
+_RIS_LINE_RE = re.compile(r"^([A-Z][A-Z0-9])\s\s-\s?(.*)")
 
 
-def _parse_year(raw: str) -> Optional[int]:
-    """Extract 4-digit year from PY/Y1 field (may be 'YYYY//' or 'YYYY')."""
-    m = re.search(r"\b(\d{4})\b", raw)
-    return int(m.group(1)) if m else None
+def _compute_title_norm(title: str) -> str:
+    """Normalise title for dedup fingerprinting."""
+    s = unicodedata.normalize("NFKC", title)
+    s = s.lower()
+    s = _PUNCT_RE.sub(" ", s)
+    s = _SPACE_RE.sub(" ", s).strip()
+    return s
 
 
-def _parse_pipe_fields(segment: str) -> dict:
-    """Parse 'key=value|key=value|...' pipe-separated fields."""
-    result = {}
-    for part in segment.split("|"):
-        part = part.strip()
-        if "=" in part:
-            k, _, v = part.partition("=")
-            result[k.strip()] = v.strip()
-    return result
+class Record:
+    """Lightweight container for a single RIS record."""
 
-
-def _parse_n1_decision(value: str, record_id: str) -> Optional[ScreeningDecision]:
-    """Parse N1 'PaperPilot Screening Current|...' into a ScreeningDecision."""
-    if not value.startswith(_N1_PREFIX):
-        return None
-    segment = value[len(_N1_PREFIX):]
-    fields = _parse_pipe_fields(segment)
-
-    decision_val = fields.get("decision", "")
-    if not decision_val:
-        return None
-
-    ts_val = fields.get("updated", date.today().isoformat())
-    # Normalise to ISO datetime if only date given
-    if re.match(r"^\d{4}-\d{2}-\d{2}$", ts_val):
-        ts_val = ts_val + "T00:00:00"
-
-    score_raw = fields.get("score")
-    evidence = f"score={score_raw}" if score_raw else None
-
-    return ScreeningDecision(
-        id=str(uuid.uuid4()),
-        record_id=record_id,
-        stage=fields.get("stage", "title_abstract"),
-        decision=decision_val,
-        reason_code=fields.get("reason") or None,
-        evidence_snippet=evidence,
-        source=fields.get("protocol", "manual"),
-        ts=ts_val,
-        created_at=ts_val,
+    __slots__ = (
+        "title", "abstract", "authors", "year", "journal",
+        "doi", "pmid", "keywords", "title_norm", "raw_import_blob",
     )
 
+    def __init__(self, **kwargs):
+        for slot in self.__slots__:
+            setattr(self, slot, kwargs.get(slot, ""))
 
-def _parse_n2_decision(value: str, record_id: str) -> Optional[ScreeningDecision]:
-    """Parse N2 'PaperPilot Screening Log {...json...}' into a ScreeningDecision."""
-    if not value.startswith(_N2_PREFIX):
-        return None
-    json_part = value[len(_N2_PREFIX):]
-    # Find the first '{' and last '}'
-    start = json_part.find("{")
-    end = json_part.rfind("}")
-    if start == -1 or end == -1:
-        return None
-    try:
-        data = json.loads(json_part[start : end + 1])
-    except json.JSONDecodeError:
-        return None
-
-    decision_val = data.get("decision", "")
-    if not decision_val:
-        return None
-
-    ts_val = data.get("ts") or data.get("created_at") or date.today().isoformat()
-
-    return ScreeningDecision(
-        id=data.get("id", str(uuid.uuid4())),
-        record_id=record_id,
-        stage=data.get("stage", "title_abstract"),
-        decision=decision_val,
-        reason_code=data.get("reason_code") or None,
-        evidence_snippet=data.get("evidence_snippet") or None,
-        source=data.get("source", "manual"),
-        ts=ts_val,
-        created_at=data.get("created_at", ts_val),
-    )
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"Record(title={self.title!r}, doi={self.doi!r})"
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-def parse_ris(text: str) -> tuple[list[Record], list[ScreeningDecision]]:
-    """Parse RIS-formatted text and return (records, decisions).
-
-    Handles standard tags plus PaperPilot-enhanced fields:
-      - ID  tag with ``RPID:<uuid>``  → record.id
-      - M1  tag with ``RPF:sha256:<hex>`` → record.fingerprint
-      - N1  tag: current screening state   → ScreeningDecision (source='n1')
-      - N2  tag: screening history entry   → ScreeningDecision (source from JSON)
-
-    Args:
-        text: Full content of a .ris file as a string.
-
-    Returns:
-        A 2-tuple ``(records, decisions)`` where each decision is linked to
-        its record via ``decision.record_id``.
+def import_ris(path: str | Path, *, encoding: str = "utf-8-sig") -> list[Record]:
     """
+    Parse *path* as a RIS file and return a list of :class:`Record` objects.
+
+    Tries several encodings automatically (utf-8-sig → utf-8 → latin-1 → cp1252).
+    The caller is responsible for writing records to the database.
+
+    Parameters
+    ----------
+    path:
+        Path to the RIS file.
+    encoding:
+        Primary encoding to try (default ``"utf-8-sig"``).
+
+    Returns
+    -------
+    list[Record]
+        One :class:`Record` per RIS entry (TY … ER block).
+    """
+    path = Path(path)
     records: list[Record] = []
-    decisions: list[ScreeningDecision] = []
 
-    # Split into individual reference blocks on ER  -
-    blocks = re.split(r"^ER\s+-.*$", text, flags=re.MULTILINE)
-
-    for block in blocks:
-        lines = block.splitlines()
-
-        # Collect raw tag → [values] for this block
-        tags: dict[str, list[str]] = {}
-        for line in lines:
-            m = _TAG_RE.match(line)
-            if m:
-                tag, val = m.group(1), m.group(2).strip()
-                tags.setdefault(tag, []).append(val)
-
-        # Skip empty blocks (no TY found and no meaningful content)
-        if not tags:
+    # Try multiple encodings
+    content: str | None = None
+    for enc in (encoding, "utf-8", "latin-1", "cp1252"):
+        try:
+            content = path.read_text(encoding=enc)
+            break
+        except (UnicodeDecodeError, LookupError):
             continue
 
-        # ---- Standard fields ------------------------------------------------
-        title = (
-            tags.get("TI", tags.get("T1", [None]))[0]
+    if content is None:
+        return records
+
+    current: dict[str, list[str]] = {}
+
+    def _flush() -> None:
+        if not current:
+            return
+        fields: dict[str, str] = {
+            "title": "", "abstract": "", "authors": "", "year": "",
+            "journal": "", "doi": "", "pmid": "", "keywords": "",
+            "title_norm": "", "raw_import_blob": "",
+        }
+        author_parts: list[str] = []
+        kw_parts: list[str] = []
+
+        for tag, values in current.items():
+            std = _TAG_MAP.get(tag)
+            if std == "authors":
+                author_parts.extend(v for v in values if v)
+            elif std == "keywords":
+                kw_parts.extend(v for v in values if v)
+            elif std and values:
+                val = values[-1].strip()
+                if std == "year":
+                    m = re.search(r"\b(\d{4})\b", val)
+                    val = m.group(1) if m else val
+                if not fields[std]:
+                    fields[std] = val
+
+        if author_parts:
+            fields["authors"] = "; ".join(author_parts)
+        if kw_parts:
+            fields["keywords"] = "; ".join(kw_parts)
+
+        fields["title_norm"] = _compute_title_norm(fields["title"])
+        fields["raw_import_blob"] = json.dumps(
+            {tag: vals for tag, vals in current.items()},
+            ensure_ascii=False,
         )
-        abstract = tags.get("AB", [None])[0]
-        authors = "; ".join(tags.get("AU", []))
-        keywords = "; ".join(tags.get("KW", []))
-        journal = (
-            tags.get("JO", tags.get("T2", [None]))[0]
-        )
+        records.append(Record(**fields))
+        current.clear()
 
-        year_raw = (tags.get("PY") or tags.get("Y1") or [None])[0]
-        year = _parse_year(year_raw) if year_raw else None
+    for line in content.splitlines():
+        line = line.rstrip()
+        m = _RIS_LINE_RE.match(line)
+        if m:
+            tag, value = m.group(1), m.group(2).strip()
+            if tag == "ER":
+                _flush()
+            elif tag == "TY":
+                if current:
+                    _flush()
+                current[tag] = [value]
+            else:
+                current.setdefault(tag, []).append(value)
+        # blank lines or continuations between blocks — skip silently
 
-        doi = tags.get("DO", [None])[0]
+    # Flush last record if file lacks a trailing ER tag
+    if current:
+        _flush()
 
-        # ---- Enhanced fields ------------------------------------------------
-        record_id: Optional[str] = None
-        fingerprint: Optional[str] = None
-
-        id_vals = tags.get("ID", [])
-        for id_val in id_vals:
-            m = _RPID_RE.search(id_val)
-            if m:
-                record_id = m.group(1).lower()
-                break
-
-        m1_vals = tags.get("M1", [])
-        for m1_val in m1_vals:
-            m = _RPF_RE.search(m1_val)
-            if m:
-                fingerprint = m.group(1).lower()
-                break
-
-        # Build Record
-        rec_kwargs = dict(
-            title=title or None,
-            abstract=abstract or None,
-            authors=authors or None,
-            keywords=keywords or None,
-            journal=journal or None,
-            year=year,
-            doi=doi or None,
-            fingerprint=fingerprint,
-        )
-        if record_id:
-            rec_kwargs["id"] = record_id
-
-        rec = Record(**rec_kwargs)
-        records.append(rec)
-
-        # ---- Decisions from N1 (current state) ------------------------------
-        for n1_val in tags.get("N1", []):
-            d = _parse_n1_decision(n1_val, rec.id)
-            if d:
-                decisions.append(d)
-
-        # ---- Decisions from N2 (history entries) ----------------------------
-        for n2_val in tags.get("N2", []):
-            d = _parse_n2_decision(n2_val, rec.id)
-            if d:
-                decisions.append(d)
-
-    return records, decisions
+    return records
