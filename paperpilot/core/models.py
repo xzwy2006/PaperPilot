@@ -1,18 +1,18 @@
-"""
-core/models.py — Pydantic models for PaperPilot core entities.
-"""
+"""core/models.py -- Pydantic models for PaperPilot core entities."""
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Optional
-
 from pydantic import BaseModel, Field
+import uuid
+
+
+def _uuid() -> str:
+    return str(uuid.uuid4())
 
 
 class Record(BaseModel):
-    """A bibliographic record imported from any source."""
-
-    id: str
+    id: str = Field(default_factory=_uuid)
     title: Optional[str] = None
     title_norm: Optional[str] = None
     abstract: Optional[str] = None
@@ -25,77 +25,74 @@ class Record(BaseModel):
     keywords: Optional[str] = None
     fingerprint: Optional[str] = None
     raw_import_blob: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
 class ScreeningDecision(BaseModel):
-    """A screening decision (title/abstract or full-text stage)."""
-
-    id: str
+    id: str = Field(default_factory=_uuid)
     record_id: str
-    stage: str  # 'title_abstract' | 'full_text'
-    decision: str  # 'include' | 'exclude' | 'maybe'
-    reason_code: Optional[str] = None  # TA001..TA011
+    stage: str = "title_abstract"
+    decision: str  # include | exclude | maybe
+    reason_code: Optional[str] = None
     evidence_snippet: Optional[str] = None
-    source: str = "manual"  # 'manual' | 'ai'
-    ts: Optional[str] = None
-    created_at: Optional[str] = None
+    source: str = "manual"
+    ts: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
-class PDFFile(BaseModel):
-    """A PDF file linked to a record."""
-
-    id: str
+class RelevanceScore(BaseModel):
     record_id: str
+    score_total: float = 0.0
+    breakdown_json: Optional[str] = None
+    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+
+
+class PdfFile(BaseModel):
+    id: str = Field(default_factory=_uuid)
+    record_id: Optional[str] = None
     file_path: str
     sha256: Optional[str] = None
     page_count: Optional[int] = None
-    linked_at: Optional[str] = None
+    linked_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
 class ExtractedValue(BaseModel):
-    """An extracted data value from a record."""
-
-    id: str
+    id: str = Field(default_factory=_uuid)
     record_id: str
-    template_id: str
+    template_id: Optional[str] = None
     field_key: str
     value: Optional[str] = None
     value_standardized: Optional[str] = None
     is_standardized: int = 0
-    source: Optional[str] = None  # 'manual' | 'ai' | 'import'
+    source: str = "manual"
     source_page: Optional[int] = None
     source_quote: Optional[str] = None
     confidence: Optional[float] = None
-    status: str = "pending"  # 'pending' | 'confirmed' | 'rejected'
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
+    status: str = "pending"
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
-class AIAuditLog(BaseModel):
-    """Audit log entry for every AI API call."""
+class AiSuggestion(BaseModel):
+    id: str = Field(default_factory=_uuid)
+    task_type: str
+    record_id: Optional[str] = None
+    field_key: Optional[str] = None
+    suggested_value: Optional[str] = None
+    confidence: Optional[float] = None
+    rationale: Optional[str] = None
+    status: str = "pending"
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
-    id: str
+
+class AiAuditLog(BaseModel):
+    id: str = Field(default_factory=_uuid)
     provider: Optional[str] = None
     model: Optional[str] = None
     task_type: Optional[str] = None
     prompt_version: Optional[str] = None
     input_hash: Optional[str] = None
     output_json: Optional[str] = None
-    status: Optional[str] = None
-    created_at: Optional[str] = None
-
-
-class AISuggestion(BaseModel):
-    """An AI-generated suggestion awaiting human review."""
-
-    id: str
-    task_type: Optional[str] = None
-    record_id: Optional[str] = None
-    field_key: Optional[str] = None
-    suggested_value: Optional[str] = None
-    confidence: Optional[float] = None
-    rationale: Optional[str] = None
-    status: str = "pending"  # 'pending' | 'accepted' | 'rejected'
-    created_at: Optional[str] = None
+    status: str = "ok"
+    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
