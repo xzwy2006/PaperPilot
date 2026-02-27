@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paperpilot"
+version = "0.1.0"
+description = "Desktop systematic review tool: import, dedup, screening, PDF extraction, meta-analysis"
+requires-python = ">=3.10"
+dependencies = [
+    "PySide6",
+    "pdfplumber",
+    "rapidfuzz",
+    "openpyxl",
+    "pydantic>=2",
+    "httpx",
+    "python-dateutil",
+]
+
+[project.scripts]
+paperpilot = "paperpilot.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["paperpilot*"]
