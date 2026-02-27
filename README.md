@@ -1,40 +1,67 @@
 # PaperPilot
 
-Desktop systematic review tool built with Python + PySide6.
+> Desktop systematic review tool with AI-assisted data extraction
 
-## Stack
-- **UI**: PySide6
-- **DB**: SQLite
-- **PDF**: pdfplumber
-- **Dedup**: rapidfuzz
-- **Export**: openpyxl (Excel), RIS
-- **Meta-analysis**: R (metafor)
-- **AI**: OpenAI-compat / Anthropic (pluggable providers)
+## Features
 
-## Phases
-- Phase 0: Scaffold + Templates + Tooling ✅
-- Phase 1: SQLite DB + Migrations + Repositories
-- Phase 2: Project System + Main Window + Record Table
-- Phase 3: Importers (CSV + RIS)
-- Phase 4: Local Dedup + AI Dedup Validation
-- Phase 5: Local Screening + AI Screening Validation
-- Phase 6: Exporters (RIS + Excel)
-- Phase 7: AI Provider Manager
-- Phase 8: PDF Manager + AI Extraction
-- Phase 9: AI Text Standardization
-- Phase 10: Meta Analysis CSV + R Runner
-- Phase 11: End-to-End Tests
+- **Import**: CSV and RIS (with PaperPilot enhanced fields for round-trip continuity)
+- **Deduplication**: Three-tier algorithm (exact ID / title+year+author / fuzzy) with evidence tracking
+- **Screening**: Rule-based auto-screening + manual decision with reason codes (TA001–TA010)
+- **PDF Management**: Link/copy PDFs, full-text extraction with section detection
+- **AI Extraction**: Structured data extraction via OpenAI / Ollama / compatible APIs
+- **AI Standardization**: Normalize extracted values to consistent units and formats
+- **Export**: RIS (with screening history embedded) and Excel (4 sheets with color coding)
+- **Meta-Analysis**: Random-effects model via R/metafor with subgroup support
 
-## Install
+## Requirements
+
+- Python 3.10+
+- PySide6 6.6+
+- R + metafor package (optional, for meta-analysis)
+
+## Installation
 
 ```bash
-pip install -e .
+pip install -e ".[all]"
 ```
 
-## Run
+## Usage
 
 ```bash
-python -m paperpilot.app
-# or
 paperpilot
+# or
+python -m paperpilot.app
 ```
+
+## Development
+
+```bash
+pip install -e ".[dev]"
+make test
+make lint
+```
+
+## Architecture
+
+```
+paperpilot/
+├── core/
+│   ├── db.py           # SQLite connection + WAL mode
+│   ├── models.py       # Pydantic models
+│   ├── repositories.py # Data access layer
+│   ├── project.py      # Project open/create
+│   ├── importers/      # CSV + RIS importers
+│   ├── dedup/          # D1/D2/D3 dedup algorithm
+│   ├── screening/      # Protocol + rules engine + scorer
+│   ├── exporters/      # RIS + Excel exporters
+│   ├── pdf/            # PDF manager + text extractor
+│   ├── ai/             # AI providers + extraction + standardization
+│   └── meta/           # Meta-analysis data prep + R runner
+└── ui/
+    ├── main_window.py  # Navigation + record table
+    └── pages/          # One page per workflow step
+```
+
+## License
+
+MIT
