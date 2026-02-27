@@ -1,0 +1,34 @@
+{
+  "name": "Default Systematic Review Protocol",
+  "version": "1.0",
+  "inclusion_criteria": [
+    "Randomized controlled trials (RCTs)",
+    "Human participants",
+    "Relevant intervention or exposure",
+    "Relevant outcomes reported"
+  ],
+  "exclusion_criteria": [
+    "Non-randomized studies",
+    "Animal studies",
+    "Case reports and case series",
+    "Reviews and meta-analyses",
+    "Conference abstracts without full text"
+  ],
+  "must_exclude_terms": [
+    "animal", "rat", "mouse", "mice", "in vitro", "cell line",
+    "case report", "case series", "letter to editor", "editorial",
+    "commentary", "retracted"
+  ],
+  "soft_exclude_terms": [
+    "pilot study", "feasibility", "protocol paper", "study design"
+  ],
+  "design_allowlist": [
+    "randomized controlled trial", "RCT", "double-blind",
+    "placebo-controlled", "crossover trial"
+  ],
+  "decision_policy": {
+    "default": "maybe",
+    "auto_exclude_on_must_term": true,
+    "require_reason_for_exclude": true
+  }
+}
