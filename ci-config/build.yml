@@ -1,0 +1,36 @@
+name: Build
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 0.2.0)"
+        required: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyinstaller && pip install -e ".[all]"
+      - run: pyinstaller paperpilot.spec --noconfirm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PaperPilot-windows
+          path: dist/
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyinstaller && pip install -e ".[all]"
+      - run: pyinstaller paperpilot.spec --noconfirm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PaperPilot-macos
+          path: dist/
