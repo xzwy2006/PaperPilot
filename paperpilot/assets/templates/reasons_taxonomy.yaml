@@ -1,0 +1,12 @@
+exclusion_reasons:
+  TA001: "Wrong study type"
+  TA002: "Wrong population"
+  TA003: "Wrong intervention"
+  TA004: "Wrong outcome"
+  TA005: "Duplicate"
+  TA006: "Non-human subjects"
+  TA007: "Clearly non-human (animal/in vitro)"
+  TA008: "Non-RCT design"
+  TA009: "Language not supported"
+  TA010: "Full text unavailable"
+  TA011: "Other"
