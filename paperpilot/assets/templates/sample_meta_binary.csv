@@ -1,0 +1,6 @@
+study_id,outcome_name,events_t,total_t,events_c,total_c
+Study_A,Primary_Outcome,15,100,25,100
+Study_B,Primary_Outcome,8,80,18,80
+Study_C,Primary_Outcome,22,120,35,120
+Study_D,Primary_Outcome,5,60,12,60
+Study_E,Primary_Outcome,30,150,45,150
